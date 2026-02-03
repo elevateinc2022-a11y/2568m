@@ -33,82 +33,10 @@ import { PaymentHistoryPage } from './components/Pages/Account/PaymentHistoryPag
 import { SubscriptionPaymentPage } from './components/Pages/SubscriptionPaymentPage';
 import { Breadcrumbs, BreadcrumbItem } from './components/UI/Breadcrumbs';
 import { User, Property, Jurisdiction, SiteConfig, PropertyStatus, SubscriptionPlan, EducationArticle, FAQItem, LegalContent, AboutContent, Subscription, PaymentHistoryItem } from './types';
-import { storage } from './services/storage';
 import { supabase } from './services/supabase';
+import { fetchProperties, fetchJurisdictions, fetchArticles, fetchFAQs, fetchSiteConfig, fetchLegalContent, fetchAboutContent, getSupabaseUserWithRole } from './utils/supabaseData';
 
 export type AdminTab = 'inventory' | 'jurisdictions' | 'faqs' | 'education' | 'about' | 'settings' | 'legal';
-
-// Helper to get user profile from Supabase
-async function getSupabaseUserWithRole(supabaseUser: any): Promise<User | null> {
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('role, subscription_status, subscription_plan, subscription_start_date, subscription_next_billing_date, subscription_trial_end_date, subscription_auto_renew, subscription_cancel_at_period_end, favorites, saved_searches, payment_history, billing_address')
-    .eq('id', supabaseUser.id)
-    .single();
-
-  if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found (new user)
-    console.error('Error fetching user profile:', error);
-    return null;
-  }
-
-  if (!profile) {
-    // New user, create a default profile
-    const defaultProfile: User = {
-      id: supabaseUser.id,
-      email: supabaseUser.email || '',
-      role: 'user', // Default role
-      favorites: [],
-      savedSearches: [],
-      subscription: {
-        status: 'trial',
-        plan: 'monthly',
-        startDate: new Date().toISOString(),
-        nextBillingDate: new Date().toISOString(),
-        trialEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 day trial
-        autoRenew: false,
-        cancelAtPeriodEnd: false
-      },
-      paymentHistory: []
-    };
-    const { data: newProfileData, error: newProfileError } = await supabase
-      .from('profiles')
-      .insert(defaultProfile)
-      .select()
-      .single();
-
-    if (newProfileError) {
-      console.error('Error creating default profile:', newProfileError);
-      return null;
-    }
-    return defaultProfile;
-  }
-
-  // Map Supabase profile data to User interface
-  const userSubscription: Subscription = {
-    status: profile.subscription_status || 'trial',
-    plan: profile.subscription_plan || 'monthly',
-    startDate: profile.subscription_start_date || new Date().toISOString(),
-    nextBillingDate: profile.subscription_next_billing_date || new Date().toISOString(),
-    trialEndDate: profile.subscription_trial_end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    autoRenew: profile.subscription_auto_renew || false,
-    cancelAtPeriodEnd: profile.subscription_cancel_at_period_end || false
-  };
-
-  const userPaymentHistory: PaymentHistoryItem[] = profile.payment_history || [];
-
-  const appUser: User = {
-    id: supabaseUser.id,
-    email: supabaseUser.email || '',
-    role: profile.role || 'user',
-    favorites: profile.favorites || [],
-    savedSearches: profile.saved_searches || [],
-    subscription: userSubscription,
-    paymentHistory: userPaymentHistory,
-    billingAddress: profile.billing_address || undefined
-  };
-
-  return appUser;
-}
 
 export default function App() {
   const [view, setView] = useState<'home' | 'listings' | 'sold-listings' | 'details' | 'education' | 'faq' | 'admin' | 'admin-packages' | 'admin-subscriptions' | 'admin-upload-packages' | 'login' | 'signup' | 'contact' | 'careers' | 'map' | 'calendar' | 'about' | 'privacy' | 'terms' | 'cookie' | 'disclaimer' | 'provinces' | 'payment' | 'account-dashboard' | 'account-billing' | 'account-history' | 'subscription-payment'>('home');
@@ -124,9 +52,9 @@ export default function App() {
   const [jurisdictions, setJurisdictions] = useState<Jurisdiction[]>([]);
   const [articles, setArticles] = useState<EducationArticle[]>([]);
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
-  const [siteConfig, setSiteConfig] = useState<SiteConfig>(storage.getSiteConfig());
-  const [legalContent, setLegalContent] = useState<LegalContent>(storage.getLegalContent());
-  const [aboutContent, setAboutContent] = useState<AboutContent>(storage.getAboutContent());
+  const [siteConfig, setSiteConfig] = useState<SiteConfig | null>(null);
+  const [legalContent, setLegalContent] = useState<LegalContent | null>(null);
+  const [aboutContent, setAboutContent] = useState<AboutContent | null>(null);
 
   const [initialProvinceFilter, setInitialProvinceFilter] = useState<string[]>([]);
   const [initialMunicipalityFilter, setInitialMunicipalityFilter] = useState<string[]>([]);
@@ -138,25 +66,29 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    // Initial load
-    setProperties(storage.getProperties());
-    setJurisdictions(storage.getJurisdictions());
-    setArticles(storage.getArticles());
-    setFaqs(storage.getFAQs());
-    setSiteConfig(storage.getSiteConfig());
-    setLegalContent(storage.getLegalContent());
-    setAboutContent(storage.getAboutContent());
+    const loadMasterData = async () => {
+      setProperties(await fetchProperties());
+      setJurisdictions(await fetchJurisdictions());
+      setArticles(await fetchArticles());
+      setFaqs(await fetchFAQs());
+      const fetchedSiteConfig = await fetchSiteConfig();
+      if (fetchedSiteConfig) setSiteConfig(fetchedSiteConfig);
+      const fetchedLegalContent = await fetchLegalContent();
+      if (fetchedLegalContent) setLegalContent(fetchedLegalContent);
+      const fetchedAboutContent = await fetchAboutContent();
+      if (fetchedAboutContent) setAboutContent(fetchedAboutContent);
+    };
+
+    loadMasterData();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         const appUser = await getSupabaseUserWithRole(session.user);
         if (appUser) {
           setUser(appUser);
-          storage.updateUser(appUser);
         }
       } else {
         setUser(null);
-        storage.updateUser(null);
       }
     });
 
@@ -166,7 +98,6 @@ export default function App() {
         const appUser = await getSupabaseUserWithRole(session.user);
         if (appUser) {
           setUser(appUser);
-          storage.updateUser(appUser);
         }
       } else if (error) {
         console.error("Error getting session:", error);
@@ -179,22 +110,7 @@ export default function App() {
     };
   }, []);
 
-  // Sync across tabs
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key?.startsWith('taxsales_')) {
-        setProperties(storage.getProperties());
-        setJurisdictions(storage.getJurisdictions());
-        setArticles(storage.getArticles());
-        setFaqs(storage.getFAQs());
-        setSiteConfig(storage.getSiteConfig());
-        setLegalContent(storage.getLegalContent());
-        setAboutContent(storage.getAboutContent());
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -303,7 +219,6 @@ export default function App() {
       const appUser = await getSupabaseUserWithRole(data.user);
       if (appUser) {
         setUser(appUser);
-        storage.updateUser(appUser);
 
         const params = new URLSearchParams(window.location.search);
         const redirectView = params.get('redirect');
@@ -329,7 +244,6 @@ export default function App() {
       alert(`Logout Error: ${error.message}`);
     }
     setUser(null);
-    storage.updateUser(null);
     handleNavigate('home');
   };
 
@@ -340,10 +254,15 @@ export default function App() {
       subscription: { ...user.subscription, ...updates }
     };
     setUser(updatedUser);
-    storage.updateUser(updatedUser);
   };
 
-  const handlePaymentSuccess = (plan: SubscriptionPlan) => {
+  const handlePaymentSuccess = async (plan: SubscriptionPlan) => {
+    if (!user) {
+      alert('User not logged in. Please log in to complete subscription.');
+      handleNavigate('login');
+      return;
+    }
+
     const planPrice = plan === 'monthly' ? 20.00 : 100.00;
     const now = new Date();
     const nextBilling = new Date();
@@ -353,40 +272,53 @@ export default function App() {
       nextBilling.setFullYear(nextBilling.getFullYear() + 1);
     }
 
-    const baseUser = user || {
-      id: `u-${Math.random().toString(36).substr(2, 9)}`,
-      email: signupEmail || 'new_subscriber@example.com',
-      role: 'user',
-      favorites: [],
-      savedSearches: [],
-      paymentHistory: []
-    } as User;
+    const updatedSubscription = {
+      status: 'active' as SubscriptionStatus,
+      plan: plan,
+      startDate: now.toISOString(),
+      nextBillingDate: nextBilling.toISOString(),
+      trialEndDate: now.toISOString(),
+      autoRenew: true,
+      cancelAtPeriodEnd: false
+    };
 
+    const newPaymentHistoryItem: PaymentHistoryItem = {
+      id: `PH-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+      date: now.toISOString(),
+      amount: planPrice,
+      plan: plan,
+      status: 'paid'
+    };
+
+    // Update Supabase profiles table
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        subscription_status: updatedSubscription.status,
+        subscription_plan: updatedSubscription.plan,
+        subscription_start_date: updatedSubscription.startDate,
+        subscription_next_billing_date: updatedSubscription.nextBillingDate,
+        subscription_trial_end_date: updatedSubscription.trialEndDate,
+        subscription_auto_renew: updatedSubscription.autoRenew,
+        subscription_cancel_at_period_end: updatedSubscription.cancelAtPeriodEnd,
+        payment_history: [...user.paymentHistory, newPaymentHistoryItem]
+      })
+      .eq('id', user.id);
+
+    if (error) {
+      console.error('Error updating subscription in Supabase:', error);
+      alert('Failed to update subscription. Please try again.');
+      return;
+    }
+
+    // Update local state
     const updatedUser: User = {
-      ...baseUser,
-      subscription: {
-        status: 'active',
-        plan: plan,
-        startDate: now.toISOString(),
-        nextBillingDate: nextBilling.toISOString(),
-        trialEndDate: now.toISOString(),
-        autoRenew: true,
-        cancelAtPeriodEnd: false
-      },
-      paymentHistory: [
-        ...(baseUser.paymentHistory || []),
-        { 
-          id: `PH-${Math.random().toString(36).substr(2, 6).toUpperCase()}`, 
-          date: now.toISOString(), 
-          amount: planPrice, 
-          plan: plan, 
-          status: 'paid' 
-        }
-      ]
+      ...user,
+      subscription: updatedSubscription,
+      paymentHistory: [...user.paymentHistory, newPaymentHistoryItem]
     };
 
     setUser(updatedUser);
-    storage.updateUser(updatedUser);
     handleNavigate('account-dashboard');
   };
 
@@ -399,7 +331,6 @@ export default function App() {
     
     const updatedUser = { ...user, favorites: newFavorites };
     setUser(updatedUser);
-    storage.updateUser(updatedUser);
   };
 
   const getBreadcrumbs = (): BreadcrumbItem[] => {
