@@ -1,0 +1,7 @@
+{
+  "name": "Maple Leaf Tax Sales Canada",
+  "description": "A comprehensive marketplace and information hub for Canadian tax sale properties, featuring advanced property filtering and an integrated admin dashboard.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

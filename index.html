@@ -1,0 +1,84 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maple Leaf Tax Sales Canada | Canadian Tax Sale Marketplace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- User Requested Leaflet Tags -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Retaining necessary plugins for the UI features while using simplified URLs -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.awesome-markers/2.0.5/leaflet.awesome-markers.css" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.4/css/all.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.awesome-markers/2.0.5/leaflet.awesome-markers.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        /* Leaflet maps REQUIRE a non-zero height to display tiles. 
+           We enforce this via CSS to prevent "white screen" issues. */
+        .leaflet-container {
+            height: 100% !important;
+            width: 100% !important;
+            background: #f8fafc !important;
+        }
+        
+        /* Custom map container height enforcement */
+        .map-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 500px;
+        }
+
+        /* Fix for Dynamic Map Popups - Squarer and more compact */
+        .leaflet-popup-content-wrapper {
+            padding: 0 !important;
+            overflow: hidden;
+            border-radius: 0.5rem !important; /* Squarer professional look */
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+        }
+        .leaflet-popup-content {
+            margin: 0 !important;
+            width: auto !important; /* Dynamic width */
+            min-width: 120px;
+            max-width: 300px;
+        }
+        .leaflet-popup-tip-container {
+            margin-top: -1px;
+        }
+        /* Ensure address fits without unnecessary wrapping */
+        .popup-address {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
