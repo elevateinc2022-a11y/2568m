@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Navbar } from './components/Layout/Navbar';
 import { Footer } from './components/Layout/Footer';
 import { Hero } from './components/Home/Hero';
@@ -32,10 +32,83 @@ import { BillingPage } from './components/Pages/Account/BillingPage';
 import { PaymentHistoryPage } from './components/Pages/Account/PaymentHistoryPage';
 import { SubscriptionPaymentPage } from './components/Pages/SubscriptionPaymentPage';
 import { Breadcrumbs, BreadcrumbItem } from './components/UI/Breadcrumbs';
-import { User, Property, Jurisdiction, SiteConfig, PropertyStatus, SubscriptionPlan, EducationArticle, FAQItem, LegalContent, AboutContent } from './types';
+import { User, Property, Jurisdiction, SiteConfig, PropertyStatus, SubscriptionPlan, EducationArticle, FAQItem, LegalContent, AboutContent, Subscription, PaymentHistoryItem } from './types';
 import { storage } from './services/storage';
+import { supabase } from './services/supabase';
 
 export type AdminTab = 'inventory' | 'jurisdictions' | 'faqs' | 'education' | 'about' | 'settings' | 'legal';
+
+// Helper to get user profile from Supabase
+async function getSupabaseUserWithRole(supabaseUser: any): Promise<User | null> {
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('role, subscription_status, subscription_plan, subscription_start_date, subscription_next_billing_date, subscription_trial_end_date, subscription_auto_renew, subscription_cancel_at_period_end, favorites, saved_searches, payment_history, billing_address')
+    .eq('id', supabaseUser.id)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found (new user)
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
+
+  if (!profile) {
+    // New user, create a default profile
+    const defaultProfile: User = {
+      id: supabaseUser.id,
+      email: supabaseUser.email || '',
+      role: 'user', // Default role
+      favorites: [],
+      savedSearches: [],
+      subscription: {
+        status: 'trial',
+        plan: 'monthly',
+        startDate: new Date().toISOString(),
+        nextBillingDate: new Date().toISOString(),
+        trialEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 day trial
+        autoRenew: false,
+        cancelAtPeriodEnd: false
+      },
+      paymentHistory: []
+    };
+    const { data: newProfileData, error: newProfileError } = await supabase
+      .from('profiles')
+      .insert(defaultProfile)
+      .select()
+      .single();
+
+    if (newProfileError) {
+      console.error('Error creating default profile:', newProfileError);
+      return null;
+    }
+    return defaultProfile;
+  }
+
+  // Map Supabase profile data to User interface
+  const userSubscription: Subscription = {
+    status: profile.subscription_status || 'trial',
+    plan: profile.subscription_plan || 'monthly',
+    startDate: profile.subscription_start_date || new Date().toISOString(),
+    nextBillingDate: profile.subscription_next_billing_date || new Date().toISOString(),
+    trialEndDate: profile.subscription_trial_end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    autoRenew: profile.subscription_auto_renew || false,
+    cancelAtPeriodEnd: profile.subscription_cancel_at_period_end || false
+  };
+
+  const userPaymentHistory: PaymentHistoryItem[] = profile.payment_history || [];
+
+  const appUser: User = {
+    id: supabaseUser.id,
+    email: supabaseUser.email || '',
+    role: profile.role || 'user',
+    favorites: profile.favorites || [],
+    savedSearches: profile.saved_searches || [],
+    subscription: userSubscription,
+    paymentHistory: userPaymentHistory,
+    billingAddress: profile.billing_address || undefined
+  };
+
+  return appUser;
+}
 
 export default function App() {
   const [view, setView] = useState<'home' | 'listings' | 'sold-listings' | 'details' | 'education' | 'faq' | 'admin' | 'admin-packages' | 'admin-subscriptions' | 'admin-upload-packages' | 'login' | 'signup' | 'contact' | 'careers' | 'map' | 'calendar' | 'about' | 'privacy' | 'terms' | 'cookie' | 'disclaimer' | 'provinces' | 'payment' | 'account-dashboard' | 'account-billing' | 'account-history' | 'subscription-payment'>('home');
@@ -64,8 +137,8 @@ export default function App() {
     return user && (user.subscription.status === 'active' || user.role === 'admin');
   }, [user]);
 
-  // Initial Load
   useEffect(() => {
+    // Initial load
     setProperties(storage.getProperties());
     setJurisdictions(storage.getJurisdictions());
     setArticles(storage.getArticles());
@@ -73,11 +146,37 @@ export default function App() {
     setSiteConfig(storage.getSiteConfig());
     setLegalContent(storage.getLegalContent());
     setAboutContent(storage.getAboutContent());
-    
-    const savedUser = storage.getUser();
-    if (savedUser) {
-       setUser(savedUser);
-    }
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        const appUser = await getSupabaseUserWithRole(session.user);
+        if (appUser) {
+          setUser(appUser);
+          storage.updateUser(appUser);
+        }
+      } else {
+        setUser(null);
+        storage.updateUser(null);
+      }
+    });
+
+    const getSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (session) {
+        const appUser = await getSupabaseUserWithRole(session.user);
+        if (appUser) {
+          setUser(appUser);
+          storage.updateUser(appUser);
+        }
+      } else if (error) {
+        console.error("Error getting session:", error);
+      }
+    };
+    getSession();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   // Sync across tabs
@@ -192,50 +291,43 @@ export default function App() {
     handleNavigate('listings', { province: provinceCode });
   };
 
-  const handleLogin = () => {
-    // Standard mock user with NO subscription to test guards
-    const newUser: User = {
-      id: 'user-001',
-      email: 'investor@example.com',
-      role: 'user',
-      favorites: [],
-      savedSearches: [],
-      subscription: {
-        status: 'expired',
-        plan: 'monthly',
-        startDate: new Date('2023-01-01').toISOString(),
-        nextBillingDate: new Date('2023-02-01').toISOString(),
-        trialEndDate: new Date('2023-01-01').toISOString(),
-        autoRenew: false,
-        cancelAtPeriodEnd: true
-      },
-      paymentHistory: []
-    };
-    
-    // For "Admin Login" simulation if they type admin
-    const isAdminUser = newUser.email.includes('admin');
-    if (isAdminUser) {
-      newUser.role = 'admin';
-      newUser.subscription.status = 'active';
+  const handleLogin = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      alert(`Login Error: ${error.message}`);
+      return;
     }
 
-    setUser(newUser);
-    storage.updateUser(newUser);
-    
-    const params = new URLSearchParams(window.location.search);
-    const redirectView = params.get('redirect');
-    const propertyId = params.get('propertyId');
+    if (data.user) {
+      const appUser = await getSupabaseUserWithRole(data.user);
+      if (appUser) {
+        setUser(appUser);
+        storage.updateUser(appUser);
 
-    if (redirectView === 'details' && propertyId) {
-       handleNavigate('details', { propId: propertyId });
-    } else if (isAdminUser) {
-       handleNavigate('admin');
-    } else {
-       handleNavigate('account-dashboard');
+        const params = new URLSearchParams(window.location.search);
+        const redirectView = params.get('redirect');
+        const propertyId = params.get('propertyId');
+
+        if (redirectView === 'details' && propertyId) {
+          handleNavigate('details', { propId: propertyId });
+        } else if (appUser.role === 'admin') {
+          handleNavigate('admin');
+        } else {
+          handleNavigate('account-dashboard');
+        }
+      } else {
+        alert('Failed to retrieve user profile.');
+      }
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Logout Error:', error);
+      alert(`Logout Error: ${error.message}`);
+    }
     setUser(null);
     storage.updateUser(null);
     handleNavigate('home');
