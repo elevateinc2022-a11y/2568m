@@ -11,9 +11,6 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
       },
-      define: {
-        'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
-        'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY)
-      },
+
     };
 });
