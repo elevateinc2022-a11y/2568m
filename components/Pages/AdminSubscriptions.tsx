@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User, SubscriptionStatus, SubscriptionPlan, PaymentHistoryItem } from '../../types';
-import { storage } from '../../services/storage';
 import { AdminToolbar } from './AdminPage';
+import { fetchAllUsers, updateUserProfile } from '../../utils/supabaseData';
 
 interface AdminSubscriptionsProps {
   onNavigate: (view: string, options?: any) => void;
@@ -10,7 +10,7 @@ interface AdminSubscriptionsProps {
 }
 
 export const AdminSubscriptions: React.FC<AdminSubscriptionsProps> = ({ onNavigate, currentTab }) => {
-  const [users, setUsers] = useState<User[]>(storage.getAllUsers());
+  const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     plan: 'all',
@@ -21,6 +21,13 @@ export const AdminSubscriptions: React.FC<AdminSubscriptionsProps> = ({ onNaviga
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showManageModal, setShowManageModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      setUsers(await fetchAllUsers());
+    };
+    loadUsers();
+  }, []);
 
   // KPIs Calculation
   const kpis = useMemo(() => {
@@ -64,11 +71,15 @@ export const AdminSubscriptions: React.FC<AdminSubscriptionsProps> = ({ onNaviga
     });
   }, [users, searchQuery, filters]);
 
-  const handleUpdateUser = (updatedUser: User) => {
-    storage.updateUser(updatedUser);
-    setUsers(storage.getAllUsers());
-    setShowManageModal(false);
-    setSelectedUser(null);
+  const handleUpdateUser = async (updatedUser: User) => {
+    const result = await updateUserProfile(updatedUser.id, updatedUser);
+    if (result) {
+      setUsers(await fetchAllUsers()); // Refetch all users to ensure consistency
+      setShowManageModal(false);
+      setSelectedUser(null);
+    } else {
+      alert('Failed to update user profile in Supabase.');
+    }
   };
 
   const getStatusBadge = (status: SubscriptionStatus) => {
