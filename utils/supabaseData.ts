@@ -254,3 +254,143 @@ export const updateUserProfile = async (userId: string, updates: Partial<User>):
   }
   return null;
 };
+
+// Save/Update functions for master data
+export const saveProperty = async (property: Property): Promise<Property | null> => {
+  const { data, error } = await supabase
+    .from('properties')
+    .upsert(property)
+    .select()
+    .single();
+  if (error) {
+    console.error('Error saving property:', error);
+    return null;
+  }
+  return data as Property;
+};
+
+export const deleteProperty = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('properties')
+    .delete()
+    .eq('id', id);
+  if (error) {
+    console.error('Error deleting property:', error);
+    return false;
+  }
+  return true;
+};
+
+export const saveJurisdiction = async (jurisdiction: Jurisdiction): Promise<Jurisdiction | null> => {
+  const { data, error } = await supabase
+    .from('jurisdictions')
+    .upsert(jurisdiction)
+    .select()
+    .single();
+  if (error) {
+    console.error('Error saving jurisdiction:', error);
+    return null;
+  }
+  return data as Jurisdiction;
+};
+
+export const deleteJurisdiction = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('jurisdictions')
+    .delete()
+    .eq('id', id);
+  if (error) {
+    console.error('Error deleting jurisdiction:', error);
+    return false;
+  }
+  return true;
+};
+
+export const saveArticle = async (article: EducationArticle): Promise<EducationArticle | null> => {
+  const { data, error } = await supabase
+    .from('education_articles')
+    .upsert(article)
+    .select()
+    .single();
+  if (error) {
+    console.error('Error saving article:', error);
+    return null;
+  }
+  return data as EducationArticle;
+};
+
+export const deleteArticle = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('education_articles')
+    .delete()
+    .eq('id', id);
+  if (error) {
+    console.error('Error deleting article:', error);
+    return false;
+  }
+  return true;
+};
+
+export const saveFAQ = async (faq: FAQItem): Promise<FAQItem | null> => {
+  const { data, error } = await supabase
+    .from('faqs')
+    .upsert(faq)
+    .select()
+    .single();
+  if (error) {
+    console.error('Error saving FAQ:', error);
+    return null;
+  }
+  return data as FAQItem;
+};
+
+export const deleteFAQ = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('faqs')
+    .delete()
+    .eq('id', id);
+  if (error) {
+    console.error('Error deleting FAQ:', error);
+    return false;
+  }
+  return true;
+};
+
+export const saveSiteConfig = async (config: SiteConfig): Promise<SiteConfig | null> => {
+  const { data, error } = await supabase
+    .from('site_config')
+    .upsert(config)
+    .select()
+    .single();
+  if (error) {
+    console.error('Error saving site config:', error);
+    return null;
+  }
+  return data as SiteConfig;
+};
+
+export const saveLegalContent = async (content: LegalContent): Promise<LegalContent | null> => {
+  const { data, error } = await supabase
+    .from('legal_content')
+    .upsert(content)
+    .select()
+    .single();
+  if (error) {
+    console.error('Error saving legal content:', error);
+    return null;
+  }
+  return data as LegalContent;
+};
+
+export const saveAboutContent = async (content: AboutContent): Promise<AboutContent | null> => {
+  const { data, error } = await supabase
+    .from('about_content')
+    .upsert(content)
+    .select()
+    .single();
+  if (error) {
+    console.error('Error saving about content:', error);
+    return null;
+  }
+  return data as AboutContent;
+};
