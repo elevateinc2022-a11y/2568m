@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, SubscriptionPlan, SiteConfig, LegalContent, BillingAddress } from '../../types';
-import { storage } from '../../services/storage';
+import { fetchLegalContent } from '../../utils/supabaseData';
 
 interface SubscriptionPaymentPageProps {
   user: User | null;
@@ -66,7 +66,10 @@ export const SubscriptionPaymentPage: React.FC<SubscriptionPaymentPageProps> = (
   });
 
   useEffect(() => {
-    setLegalContent(storage.getLegalContent());
+    const loadLegalContent = async () => {
+      setLegalContent(await fetchLegalContent());
+    };
+    loadLegalContent();
   }, []);
 
   useEffect(() => {
