@@ -122,7 +122,7 @@ export const Hero: React.FC<HeroProps> = ({ config, properties, onViewDetails, o
 
         {/* News Ticker Area - Specifically requested below main content but within Hero */}
         <div className="mt-4">
-          <NewsTicker items={config.newsItems} />
+          <NewsTicker items={config.newsItems || []} />
         </div>
       </div>
     </div>
