@@ -32,7 +32,7 @@ export const fetchJurisdictions = async (): Promise<Jurisdiction[]> => {
 };
 
 export const fetchArticles = async (): Promise<EducationArticle[]> => {
-  return fetchData<EducationArticle>('education_articles');
+  return fetchData<EducationArticle>('articles');
 };
 
 export const fetchFAQs = async (): Promise<FAQItem[]> => {
@@ -308,7 +308,7 @@ export const deleteJurisdiction = async (id: string): Promise<boolean> => {
 
 export const saveArticle = async (article: EducationArticle): Promise<EducationArticle | null> => {
   const { data, error } = await supabase
-    .from('education_articles')
+    .from('articles')
     .upsert(article)
     .select()
     .single();
@@ -321,7 +321,7 @@ export const saveArticle = async (article: EducationArticle): Promise<EducationA
 
 export const deleteArticle = async (id: string): Promise<boolean> => {
   const { error } = await supabase
-    .from('education_articles')
+    .from('articles')
     .delete()
     .eq('id', id);
   if (error) {
