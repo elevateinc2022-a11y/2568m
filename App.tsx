@@ -606,6 +606,14 @@ export default function App() {
     }
   };
 
+  if (!siteConfig || !legalContent || !aboutContent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-xl font-bold">Loading application data...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col font-sans antialiased">
       <Navbar 
